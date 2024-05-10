@@ -1,0 +1,103 @@
+﻿@page "/create-post"
+@using BlazorClient.Constants
+@using BlazorClient.Helpers
+@using global::Shared.Constant
+@using global::Shared.Dtos
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Create a post</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <p>
+            Header
+            <input type="text" @bind="Header" />
+        </p>
+        <p>
+            Content
+            <textarea rows="5" @bind="Content"></textarea>
+        </p>
+
+        @if (IsProfileSetUp == false)
+        {
+            <p>Set up your profile before posting!</p>
+        }
+        else if (IsProfileSetUp == true)
+        {
+            if (PostCreated == null)
+            {
+                <button class="btn btn-primary" @onclick="Post">Post</button>
+            }
+            else if (PostCreated == true)
+            {
+                <p>Success!</p>
+            }
+            else
+            {
+                <p>Something went wrong.</p>
+            }
+        }
+    </Authorized>
+    <NotAuthorized>
+        No access here!
+    </NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+    private HttpClient? ProfileHttp { get; set; }
+    private HttpClient? TimelineHttp { get; set; }
+
+    private string? Header;
+    private string? Content;
+
+    private string? Sub { get; set; }
+    private int UserId;
+
+    private bool? IsProfileSetUp { get; set; }
+    private bool? PostCreated { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+        TimelineHttp = HttpClientFactory.CreateClient(HttpService.Timeline);
+
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        var url = $"{Route.Request.GetProfileWithSub}{Sub}";
+        var profile = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+        IsProfileSetUp = profile != null;
+
+        if (profile != null)
+        {
+            UserId = profile.Id;
+        }
+    }
+
+    private async void Post()
+    {
+        var post = new RawPostDto()
+            {
+                AuthorId = UserId,
+                Header = Header,
+                Content = Content,
+                Date = DateTime.Now
+            };
+
+        var url = $"{Route.Request.AddPost}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, post);
+
+        if (response.IsSuccessStatusCode)
+        {
+            PostCreated = true;
+        }
+        else
+        {
+            PostCreated = false;
+        }
+
+        StateHasChanged();
+    }
+}

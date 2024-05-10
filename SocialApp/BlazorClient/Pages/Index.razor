@@ -1,0 +1,90 @@
+﻿@page "/"
+@using global::Shared.Constant
+@using global::Shared.Dtos
+@using BlazorClient.Helpers
+@using BlazorClient.Constants
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Home</PageTitle>
+
+<h1>This is Kakaw.</h1>
+
+Welcome, fellow human.
+
+<AuthorizeView>
+    <Authorized>
+        @if (User is not null)
+        {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Header</th>
+                        <th>Author</th>
+                        <th>Date</th>
+                        <th>Content</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var post in Timeline)
+                    {
+                        <tr>
+                            <td>@post.Header</td>
+                            <td><a href="/user/@post.Author?.Handle">@post.Author?.Handle</a></td>
+                            <td>@post.Date?.ToShortDateString() @post.Date?.ToShortTimeString()</td>
+                            <td>@post.Content</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else if (HasProfile == false)
+        {
+            <p><a href="/create-profile">Set up your profile!</a></p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        To access Kakaw, <a href="/authentication/login">log in</a> first!
+    </NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+    private HttpClient? ProfileHttp { get; set; }
+    private HttpClient? TimelineHttp { get; set; }
+
+    private string? Sub;
+
+    private UserDto? User;
+    private bool? HasProfile;
+
+    private List<PostDto> Timeline = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+        TimelineHttp = HttpClientFactory.CreateClient(HttpService.Timeline);
+
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        if (Sub != null)
+        {
+            var url = $"{Route.Request.GetProfileWithSub}{Sub}";
+            User = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+            HasProfile = User != null;
+
+            StateHasChanged();
+
+            if (HasProfile == true)
+            {
+                var timelineUrl = Route.Request.GetHomeTimeline(User?.Handle, 0, 20);
+
+                Timeline = (await TimelineHttp.GetFromJsonAsync<PostDto[]>(timelineUrl) ?? Enumerable.Empty<PostDto>())
+                .ToList();
+
+                StateHasChanged();
+            }
+        }
+    }
+}

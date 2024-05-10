@@ -1,0 +1,47 @@
+services:
+  blazor-client:
+    image: thejoun/blazor-client
+    ports:
+      - 80:80
+    domainname: pisproject
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.1'
+          memory: 0.1G
+  user-timeline-service:
+    image: thejoun/user-timeline-service
+    ports:
+      - 5001:5001
+    domainname: pisproject
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.1'
+          memory: 0.1G
+  user-profile-service:
+    image: thejoun/user-profile-service
+    ports:
+      - 5002:5002
+    domainname: pisproject
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.1'
+          memory: 0.1G
+  follow-service:
+    image: thejoun/follow-service
+    ports:
+      - 5003:5003
+    domainname: pisproject
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.1'
+          memory: 0.1G

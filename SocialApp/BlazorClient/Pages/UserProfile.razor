@@ -1,0 +1,514 @@
+﻿@page "/user/{userhandle}"
+@using global::Shared.Dtos
+@using BlazorClient.Constants
+@using BlazorClient.Helpers
+@using global::Shared.Constant
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>User Profile</PageTitle>
+
+@if (UserFound == false)
+{
+    <p>
+        This user does not exist.
+    </p>
+}
+else if (User == null)
+{
+    <p>
+        <em>Fetching user...</em>
+    </p>
+}
+else
+{
+    <h1>@User.DisplayName</h1>
+
+    <p>#@User.Handle</p>
+
+    @if (User.Email is not null)
+    {
+        <p>@User.Email</p>
+    }
+
+    <p>@User.FollowerCount followers, @User.FollowingCount following</p>
+}
+
+@if (IsOwnProfile == false && IsFollowing == false)
+{
+    <p>
+        <button class="btn btn-primary" @onclick="Follow">Follow</button>
+    </p>
+}
+else if (IsOwnProfile == false && IsFollowing == true)
+{
+    <p>
+        <button class="btn btn-primary" @onclick="Unfollow">Unfollow</button>
+        You're following this user!
+    </p>
+}
+
+@if (IsFollower == true)
+{
+    <p>
+        This user is following you!
+    </p>
+}
+
+@if (UserFound == false)
+{
+
+}
+else if (Posts == null)
+{
+    <p>
+        <em>Fetching posts...</em>
+    </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Header</th>
+                <th>Date</th>
+                <th>Content</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var post in Posts)
+            {
+                <tr>
+                    <td>@post.Header</td>
+                    <td>@post.Date?.ToShortDateString() @post.Date?.ToShortTimeString()</td>
+                    <td>@post.Content</td>
+
+                    <td>Likes: @UPLs.Count(x => x.PostId == post.Id);</td>
+                    @if (UPLs == null)
+                    {
+                        <button class="btn btn-primary" @onclick="() => LikePost(post)">Like</button>
+                    }
+                    else if (UPLs.Count == 0)
+                    {
+                        <button class="btn btn-primary" @onclick="() => LikePost(post)">Like</button>
+                    }
+                    else if (UPLs.Find(x => x.UserId == OwnProfile.Id && x.PostId == post.Id) != null)
+                    {
+                        <button class="btn btn-primary" @onclick="() => RemoveLikePost(post)">Remove Like</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" @onclick="() => LikePost(post)">Like</button>
+                    }
+                </tr>
+
+                @if (Comments != null)
+                {
+                    @foreach (var comment in Comments)
+                    {
+                        @if (comment.PostId == post.Id)
+                        {
+                            <tr>
+                                <td>Comment by: @comment.AuthorName</td>
+                                <td>@comment.Date?.ToShortDateString() @comment.Date?.ToShortTimeString()</td>
+                                <td>@comment.Content</td>
+                                <td>Likes: @comment.likes</td>
+                                @if (UCLs == null)
+                                {
+                                    <button class="btn btn-primary" @onclick="() => LikeComment(comment)">Like</button>
+                                }
+                                else if (UCLs.Count == 0)
+                                {
+                                    <button class="btn btn-primary" @onclick="() => LikeComment(comment)">Like</button>
+                                }
+                                else if (UCLs.Find(x => x.UserId == OwnProfile.Id && x.CommentId == comment.Id) != null)
+                                {
+                                    <button class="btn btn-primary" @onclick="() => RemoveLikeComment(comment)">Remove Like</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-primary" @onclick="() => LikeComment(comment)">Like</button>
+                                }
+                            </tr>
+                        }
+                    }
+                }
+                <p>
+                    <tr>
+                        @if (AddCommentSelectedPostId != post.Id)
+                        {
+                            <button class="btn btn-primary" @onclick="() => AddComment(post.Id)">Add Comment</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-primary" @onclick="RemoveComment">Remove Comment</button>
+                            <input type="content" @bind="Content" />
+                            <button class="btn btn-primary" @onclick="Comment">Post Comment</button>
+                        }
+                    </tr>
+
+                </p>
+            }
+        </tbody>
+    </table>
+}
+
+@code
+{
+    [Parameter]
+    public string? UserHandle { get; set; }
+
+    private HttpClient? ProfileHttp { get; set; }
+    private HttpClient? TimelineHttp { get; set; }
+    private HttpClient? FollowHttp { get; set; }
+
+    private string? Sub;
+
+    private UserDto? User;
+    private List<PostDto>? Posts;
+    private List<CommentDto>? Comments;
+    private List<User_CommentLikedDto> UCLs = new();
+
+    private List<User_PostLikedDto> UPLs = new();
+    private UserDto? OwnProfile;
+
+    private int UserId;
+    private string? Content;
+    private bool? IsProfileSetUp { get; set; }
+    private bool? CommentCreated { get; set; }
+
+    private int AddCommentSelectedPostId { get; set; }
+
+
+    private bool? UserFound;
+    private bool? IsFollowing;
+    private bool? IsFollower;
+
+    private bool CheckedFollow;
+
+    private bool? IsOwnProfile => User is null || OwnProfile is null
+        ? null
+        : User?.Handle == OwnProfile?.Handle;
+
+    protected override async Task OnInitializedAsync()
+    {
+        TimelineHttp = HttpClientFactory.CreateClient(HttpService.Timeline);
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+        FollowHttp = HttpClientFactory.CreateClient(HttpService.Follow);
+
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        var url = $"{Route.Request.GetProfileWithSub}{Sub}";
+        var profile = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+        IsProfileSetUp = profile != null;
+
+        if (profile != null)
+        {
+            UserId = profile.Id;
+        }
+
+        await Init();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Init();
+    }
+
+    private async Task Init()
+    {
+        User = null;
+        UserFound = null;
+        IsFollowing = null;
+        IsFollower = null;
+
+        StateHasChanged();
+
+        FetchProfile();
+        FetchPosts();
+        FetchComments();
+        FetchUserCommentsLikes();
+        FetchUserPostsLikes();
+
+        if (await AuthenticationStateProvider.GetGoogleUserSub() != null)
+        {
+            FetchOwnProfile();
+        }
+    }
+
+    private async Task Follow()
+    {
+        var url = $"{Route.Request.AddFollow}";
+
+        var follow = new FollowDto()
+            {
+                Follower = OwnProfile?.Handle,
+                Following = User?.Handle
+            };
+
+        await FollowHttp.PostAsJsonAsync(url, follow);
+
+        await Task.Delay(1000);
+
+        FetchIsFollowing();
+        FetchProfile();
+    }
+
+    private async Task Unfollow()
+    {
+        var url = $"{Route.Request.RemoveFollow}";
+
+        var follow = new FollowDto()
+            {
+                Follower = OwnProfile?.Handle,
+                Following = User?.Handle
+            };
+
+        await FollowHttp.PostAsJsonAsync(url, follow);
+
+        await Task.Delay(1000);
+
+        FetchIsFollowing();
+        FetchProfile();
+    }
+
+    private async Task FetchProfile()
+    {
+        var url = $"{Route.Request.GetProfileWithHandle}{UserHandle}";
+
+        User = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+        UserFound = User != null;
+
+        StateHasChanged();
+
+        await OnProfileFetched();
+    }
+
+    private async Task FetchOwnProfile()
+    {
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        var url = $"{Route.Request.GetProfileWithSub}{Sub}";
+
+        OwnProfile = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+        StateHasChanged();
+
+        await OnProfileFetched();
+    }
+
+    private async Task FetchPosts()
+    {
+        var url = $"{Route.Request.GetPostsForUserHandle}{UserHandle}";
+
+        Posts = (await TimelineHttp.GetFromJsonAsync<PostDto[]>(url) ?? Enumerable.Empty<PostDto>()).ToList();
+
+        StateHasChanged();
+    }
+
+    private async Task FetchComments()
+    {
+        var url = $"{Route.Request.GetComments}";
+        Comments = (await TimelineHttp.GetFromJsonAsync<CommentDto[]>(url) ?? Enumerable.Empty<CommentDto>()).ToList();
+
+        StateHasChanged();
+    }
+
+
+    private async Task FetchUserCommentsLikes()
+    {
+        var url = $"{Route.Request.GetUCL}";
+        UCLs = (await TimelineHttp.GetFromJsonAsync<User_CommentLikedDto[]>(url) ??
+        Enumerable.Empty<User_CommentLikedDto>()).ToList();
+
+        StateHasChanged();
+    }
+
+    private async Task FetchUserPostsLikes()
+    {
+        var url = $"{Route.Request.GetUPL}";
+        UPLs = (await TimelineHttp.GetFromJsonAsync<User_PostLikedDto[]>(url) ??
+        Enumerable.Empty<User_PostLikedDto>()).Where(a => a != null).ToList();
+
+        StateHasChanged();
+    }
+
+    private async Task OnProfileFetched()
+    {
+        if (User != null && OwnProfile != null && !CheckedFollow)
+        {
+            CheckedFollow = true;
+
+            FetchIsFollowing();
+            FetchIsFollower();
+        }
+    }
+
+    private async Task FetchIsFollowing()
+    {
+        var url = Route.Request.IsFollowing(OwnProfile?.Handle, User?.Handle);
+
+        IsFollowing = await FollowHttp.GetFromJsonAsync<bool>(url);
+
+        StateHasChanged();
+    }
+
+    private async Task FetchIsFollower()
+    {
+        var url = Route.Request.IsFollowing(User?.Handle, OwnProfile?.Handle);
+
+        IsFollower = await FollowHttp.GetFromJsonAsync<bool>(url);
+
+        StateHasChanged();
+    }
+
+    private async void AddComment(int id)
+    {
+        AddCommentSelectedPostId = id;
+        
+        StateHasChanged();
+    }
+
+    private async void RemoveComment()
+    {
+        AddCommentSelectedPostId = -1;
+        
+        StateHasChanged();
+    }
+
+    private async void Comment()
+    {
+        var comment = new RawCommentDto()
+        {
+            PostId = AddCommentSelectedPostId,
+            AuthorId = UserId,
+            Content = Content,
+            Date = DateTime.Now,
+            likes = 0,
+            AuthorName = OwnProfile.DisplayName,
+        };
+
+        var url = $"{Route.Request.AddComment}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, comment);
+
+        if (response.IsSuccessStatusCode)
+        {
+            CommentCreated = true;
+        }
+        else
+        {
+            CommentCreated = false;
+        }
+
+        await FetchComments();
+
+        RemoveComment();
+
+        await FetchUserCommentsLikes();
+        
+        // not needed
+        // await Init();
+        
+        StateHasChanged();
+    }
+
+    private async void LikeComment(CommentDto comment)
+    {
+        RawCommentDto rawComment = new RawCommentDto
+            {
+                PostId = comment.PostId,
+                Id = comment.Id,
+                Content = comment.Content,
+                Date = comment.Date,
+                likes = comment.likes,
+                AuthorName = comment.AuthorName,
+            };
+        var url = $"{Route.Request.AddLike}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, rawComment);
+        
+        User_CommentLikedDto ucDto = new User_CommentLikedDto
+            {
+                UserId = OwnProfile.Id,
+                CommentId = comment.Id,
+            };
+        var url2 = $"{Route.Request.AddUCL}";
+        var response2 = await TimelineHttp.PostAsJsonAsync(url2, ucDto);
+        
+        await FetchComments();
+        await FetchUserCommentsLikes();
+        
+        StateHasChanged();
+        
+        // not needed
+        // await Init();
+    }
+
+
+    private async void RemoveLikeComment(CommentDto comment)
+    {
+        await FetchUserCommentsLikes();
+
+        var url = $"{Route.Request.RemoveLike}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, comment);
+
+        var url2 = $"{Route.Request.RemoveUCL}";
+        var response2 = await TimelineHttp.PostAsJsonAsync(url2, UCLs.Find(x => x.CommentId == comment.Id));
+
+        await FetchComments();
+        await FetchUserCommentsLikes();
+        
+        StateHasChanged();
+        
+        // not needed
+        // await Init();
+    }
+
+    private async void LikePost(PostDto post)
+    {
+        RawPostDto rawPost = new RawPostDto
+            {
+                Id = post.Id,
+                Content = post.Content,
+                Header = post.Header,
+                Date = post.Date,
+                likes = post.likes,
+                AuthorId = User.Id,//!!
+            };
+
+        var url = $"{Route.Request.AddLike}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, rawPost);
+
+        User_PostLikedDto ucDto = new User_PostLikedDto
+            {
+                UserId = OwnProfile.Id,
+                PostId = post.Id,
+            };
+        var url2 = $"{Route.Request.AddUPL}";
+        var response2 = await TimelineHttp.PostAsJsonAsync(url2, ucDto);
+        post.likes += 1;
+
+        await FetchPosts();
+        await FetchUserPostsLikes();
+        StateHasChanged();
+        await Init();
+    }
+
+
+    private async void RemoveLikePost(PostDto post)
+    {
+        await FetchUserPostsLikes();
+
+        var url = $"{Route.Request.RemoveLike}";
+        var response = await TimelineHttp.PostAsJsonAsync(url, post);
+
+        var url2 = $"{Route.Request.RemoveUPL}";
+        var response2 = await TimelineHttp.PostAsJsonAsync(url2, UPLs.Find(x => x.PostId == post.Id));
+        post.likes -= 1;
+        await FetchPosts();
+        await FetchUserPostsLikes();
+        StateHasChanged();
+        await Init();
+    }
+}

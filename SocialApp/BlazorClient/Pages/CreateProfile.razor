@@ -1,0 +1,157 @@
+﻿@page "/create-profile"
+@using BlazorClient.Constants
+@using BlazorClient.Helpers
+@using global::Shared.Constant
+@using global::Shared.Dtos
+@inject NavigationManager Navigation
+@inject IHttpClientFactory HttpClientFactory
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Create Profile</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        @if (IsProfileSetUp == true)
+        {
+            <p>Your profile already exists.</p>
+        }
+        else if (IsProfileSetUp == false)
+        {
+            if (ProfileCreated is null)
+            {
+                <h1>Set up your profile!</h1>
+            
+                <p>
+                    Handle
+                    <input type="text" @bind="Handle" @oninput="OnHandleInput"/>
+                    <button class="btn btn-primary" @onclick="CheckHandle">Check availability</button>
+                </p>
+                <p>
+                    Display name
+                    <input type="text" @bind="DisplayName"/>
+                </p>
+                <p>
+                    Email
+                    <input type="text" @bind="Email"/>
+                </p>
+            
+                if (HandleAvailable == true)
+                {
+                    <button class="btn btn-primary" @onclick="Create">Create profile!</button>
+                }
+                else if (HandleAvailable == false)
+                {
+                    <p>Handle not available.</p>
+                }
+            }
+            else if (ProfileCreated == true)
+            {
+                <p>Profile created!</p>
+                
+                <button class="btn btn-primary" @onclick="MyProfile">Take a look!</button>
+            }
+            else if (ProfileCreated == false)
+            {
+                <p>Something went wrong.</p>
+            }
+        }
+        else
+        {
+            <p>Checking stuff...</p>
+        }
+    </Authorized>
+    <NotAuthorized>
+        No access here!
+    </NotAuthorized>
+</AuthorizeView>
+
+@code 
+{
+    private HttpClient? ProfileHttp { get; set; }
+
+    private string? Sub { get; set; }
+
+    private string? Handle { get; set; }
+    private string? DisplayName { get; set; }
+    private string? Email { get; set; }
+
+    private bool? IsProfileSetUp { get; set; }
+    private bool? HandleAvailable { get; set; }
+    private bool? ProfileCreated { get; set; }
+
+    private async void OnHandleInput()
+    {
+        HandleAvailable = null;
+        
+        StateHasChanged();
+    }
+
+    private void MyProfile() => Navigation.NavigateTo($"user/{Handle}");
+    
+    private async void Create()
+    {
+        var user = new UserDto()
+        {
+            Email = Email,
+            Handle = Handle,
+            DisplayName = DisplayName,
+            JoinDate = DateTime.Now,
+            Sub = Sub
+        };
+        
+        var url = $"{Route.Request.CreateProfile}";
+
+        var response = await ProfileHttp.PostAsJsonAsync(url, user);
+
+        if (response.IsSuccessStatusCode)
+        {
+            ProfileCreated = true;
+        }
+        else
+        {
+            ProfileCreated = false;
+        }
+        
+        StateHasChanged();
+    }
+    
+    private async void CheckHandle()
+    {
+        if (Handle is null || Handle.Length <= 3)
+        {
+            HandleAvailable = false;
+            return;
+        }
+        
+        var url = $"{Route.Request.HasProfileWithHandle}{Handle}";
+        
+        HandleAvailable = !await ProfileHttp.GetFromJsonAsync<bool>(url);
+        
+        StateHasChanged();
+    }
+
+    private async Task CheckProfileExists()
+    {
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        if (Sub == null)
+        {
+            Console.WriteLine("No sub specified");
+            return;
+        }
+
+        var url = $"{Route.Request.HasProfileWithSub}{Sub}";
+
+        IsProfileSetUp = await ProfileHttp.GetFromJsonAsync<bool>(url);
+        
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+
+        await CheckProfileExists();
+    }
+
+}

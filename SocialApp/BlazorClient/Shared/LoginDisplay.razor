@@ -1,0 +1,88 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using BlazorClient.Constants
+@using BlazorClient.Helpers
+@using global::Shared.Constant
+@using global::Shared.Dtos
+@using global::Shared.Model
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IHttpClientFactory HttpClientFactory
+
+<AuthorizeView>
+    <Authorized>
+        Hello, @context.User.Identity?.Name
+        
+        @if (IsProfileSetUp == true && UserHandle != null)
+        {
+            <button class="nav-link btn btn-link" @onclick="MyProfile">My profile</button>
+        }
+        else if (IsProfileSetUp == false)
+        {
+            <button class="nav-link btn btn-link" @onclick="CreateProfile">Set up profile</button>
+        }
+        
+        <button class="nav-link btn btn-link" @onclick="LogOut">Log out</button>
+    </Authorized>
+    <NotAuthorized>
+        <a href="authentication/login">Log in</a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code
+{
+    private HttpClient? ProfileHttp { get; set; }
+    
+    private string? UserHandle { get; set; }
+    private bool? IsProfileSetUp { get; set; }
+
+    private string? Sub;
+
+    private void LogOut() => Navigation.NavigateToLogout("authentication/logout");
+    private void MyProfile() => Navigation.NavigateTo($"user/{UserHandle}");
+    private void CreateProfile() => Navigation.NavigateTo("create-profile");
+
+    protected override async Task OnInitializedAsync()
+    {
+        Sub = await AuthenticationStateProvider.GetGoogleUserSub();
+
+        if (Sub is null) return;
+        
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+
+        await CheckIfProfileSetUp(Sub);
+
+        if (IsProfileSetUp == true)
+        {
+            GetUserHandle(Sub);
+        }
+    }
+
+    private async Task CheckIfProfileSetUp(string sub)
+    {
+        var url = $"{Route.Request.HasProfileWithSub}{sub}";
+
+        IsProfileSetUp = await ProfileHttp.GetFromJsonAsync<bool>(url);
+        
+        StateHasChanged();
+    }
+    
+    private async void GetUserHandle(string? sub)
+    {
+        if (sub == null)
+        {
+            Console.WriteLine("No sub specified");
+            return;
+        }
+
+        var url = $"{Route.Request.GetProfileWithSub}{sub}";
+        var profile = await ProfileHttp.GetFromJsonAsync<UserDto?>(url);
+
+        if (profile != null)
+        {
+            UserHandle = profile.Handle;
+            
+            StateHasChanged();
+        }
+    }
+}

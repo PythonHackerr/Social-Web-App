@@ -1,0 +1,40 @@
+services:
+  blazor-client:
+    image: thejoun/blazor-client
+    build:
+      context: .
+      dockerfile: BlazorClient/Dockerfile
+    ports:
+      - 5000:80
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+  user-timeline-service:
+    image: thejoun/user-timeline-service
+    build: 
+      context: .
+      dockerfile: UserTimelineService/Dockerfile
+    ports:
+      - 5001:5001
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+      - ASPNETCORE_ENVIRONMENT=Development
+  user-profile-service:
+    image: thejoun/user-profile-service
+    build:
+      context: .
+      dockerfile: UserProfileService/Dockerfile
+    ports:
+      - 5002:5002
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+      - ASPNETCORE_ENVIRONMENT=Development
+  follow-service:
+    image: thejoun/follow-service
+    build:
+      context: .
+      dockerfile: FollowService/Dockerfile
+    ports:
+      - 5003:5003
+    environment:
+      - ConnectionStrings__Default=Server=pismysqlserv.mysql.database.azure.com;Uid=Admin123;Pwd=Password123!;Database=twittercopy
+      - ASPNETCORE_ENVIRONMENT=Development

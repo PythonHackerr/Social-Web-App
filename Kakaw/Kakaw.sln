@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KakawTest", "KakawTest\KakawTest.csproj", "{C141D1E7-AF61-4C27-AA39-BD1958286A4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kakaw", "Kakaw\Kakaw.csproj", "{BFFE1C3A-E53C-4EF1-B708-38136EDBE39E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C141D1E7-AF61-4C27-AA39-BD1958286A4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C141D1E7-AF61-4C27-AA39-BD1958286A4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C141D1E7-AF61-4C27-AA39-BD1958286A4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C141D1E7-AF61-4C27-AA39-BD1958286A4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFFE1C3A-E53C-4EF1-B708-38136EDBE39E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFFE1C3A-E53C-4EF1-B708-38136EDBE39E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFFE1C3A-E53C-4EF1-B708-38136EDBE39E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFFE1C3A-E53C-4EF1-B708-38136EDBE39E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

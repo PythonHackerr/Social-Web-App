@@ -1,0 +1,50 @@
+﻿@page "/user-search"
+@using global::Shared.Constant
+@using global::Shared.Dtos
+@using BlazorClient.Constants
+@inject NavigationManager NavigationManager
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>User Search</PageTitle>
+
+<h1>User Search</h1>
+
+<input type="search" @bind="Handle" />
+
+<button class="btn btn-primary" @onclick="Search">Search</button>
+
+@if (UserExists == false)
+{
+    <p>No such user exists.</p>
+}
+
+@code 
+{
+    private HttpClient? ProfileHttp { get; set; }
+    
+    private string? Handle { get; set; }
+    private bool? UserExists;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProfileHttp = HttpClientFactory.CreateClient(HttpService.Profile);
+    }
+
+    private async void Search()
+    {
+        var url = $"{Route.Request.HasProfileWithHandle}{Handle}";
+
+        var profile = await ProfileHttp.GetFromJsonAsync<bool>(url);
+
+        if (profile)
+        {
+            NavigationManager.NavigateTo($"user/{Handle}");
+        }
+        else
+        {
+            UserExists = false;
+            StateHasChanged();
+        }
+    }
+
+}
