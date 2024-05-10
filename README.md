@@ -50,8 +50,8 @@ buildah login docker.io
 Build (example for UserProfileService)
 
 ```sh
-git clone https://github.com/thejoun/pis-project.git
-cd pis-project/
+git clone https://github.com/PythonHackerr/Social-Web-App.git
+cd Social-Web-App/
 buildah bud -f UserProfileService/Dockerfile -t thejoun/user-profile-service .
 ```
 
